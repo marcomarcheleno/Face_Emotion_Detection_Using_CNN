@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Face Emotion Detector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
+    <style>
+        @keyframes scan {
+            0%, 100% { transform: translateY(0); opacity: 0.3; }
+            50% { transform: translateY(100%); opacity: 0.7; }
+        }
+        .scan-line {
+            animation: scan 2s ease-in-out infinite;
+        }
+        .glow {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-red-900 via-rose-900 to-slate-900 min-h-screen text-white">
+
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-4xl font-extrabold mb-2 bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+                🤖 AI Face Emotion Detector
+            </h1>
+            <p class="text-gray-300 text-sm">Built by Jason Istioso, Jeremiah Gerard and Marco Marcheleno </p>
+            <div id="loadingModel" class="mt-4 text-yellow-400 font-semibold animate-pulse">
+                ⏳ Loading AI Models...
+            </div>
+        </div>
+        <!-- Main Grid -->
+<div class="grid lg:grid-cols-3 gap-6">
+
+    <!-- LEFT SIDE – Camera + Upload -->
+    <div class="lg:col-span-2 space-y-6">
+
+        <!-- Camera Section (LEFT BIG) -->
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 glow">
+            <div class="relative bg-black rounded-xl overflow-hidden" style="aspect-ratio: 16/9;">
+                <video id="video" autoplay muted playsinline class="w-full h-full object-cover"></video>
+                <canvas id="canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
+                <div class="scan-line absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50 pointer-events-none"></div>
+            </div>
+
+            <div class="flex gap-3 mt-4 justify-center flex-wrap">
+                <button id="startBtn" class="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl font-bold text-sm shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                    ▶️ Start Camera
+                </button>
+                <button id="stopBtn" class="px-8 py-3 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 rounded-xl font-bold text-sm shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" disabled>
+                    ⏹️ Stop Camera
+                </button>
+            </div>
+        </div>
+
+        <!-- Upload Image (LEFT UNDER CAMERA) -->
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 glow">
+            <h2 class="text-xl font-bold mb-3 text-center bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                📤 Upload Image for Emotion Detection
+            </h2>
+
+            <input 
+                type="file" 
+                id="uploadFile"
+                accept="image/*"
+                class="w-full text-sm bg-gray-700 p-2 rounded-lg"
+            />
+
+            <div class="mt-4">
+                <img id="previewImage" class="hidden rounded-xl w-full">
+            </div>
+
+            <button id="analyzeBtn" class="mt-4 w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                🔎 Analyze Image
+            </button>
+        </div>
+
+    </div>
+
+    <!-- RIGHT SIDE – -->
+    <div class="space-y-4">
+
+        <!-- Real-time Stats -->
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 glow">
+            <h2 class="text-xl font-bold mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                📊 Real-time Stats
+            </h2>
+
+            <div class="space-y-3">
+                <div class="bg-gray-700 bg-opacity-50 rounded-xl p-3 flex justify-between items-center">
+                    <span class="text-sm font-semibold text-gray-300">🤖 AI Status</span>
+                    <span id="aiStatus" class="px-3 py-1 bg-red-600 rounded-full text-xs font-bold">OFFLINE</span>
+                </div>
+                <div class="bg-gray-700 bg-opacity-50 rounded-xl p-3 flex justify-between items-center">
+                    <span class="text-sm font-semibold text-gray-300">👥 Faces Detected</span>
+                    <span id="faceCount" class="text-2xl font-bold text-cyan-400">0</span>
+                </div>
+                <div class="bg-gray-700 bg-opacity-50 rounded-xl p-3 flex justify-between items-center">
+                    <span class="text-sm font-semibold text-gray-300">⚡ FPS</span>
+                    <span id="fps" class="text-2xl font-bold text-green-400">0</span>
+                </div>
+                <div class="bg-gray-700 bg-opacity-50 rounded-xl p-3 flex justify-between items-center">
+                    <span class="text-sm font-semibold text-gray-300">🎯 Confidence</span>
+                    <span id="avgConfidence" class="text-xl font-bold text-purple-400">0%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Emotion Analysis -->
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 glow max-h-[500px] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4 text-center bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent">
+                🎭 Emotion Analysis
+            </h3>
+
+            <div id="results" class="space-y-3">
+                <div class="text-center text-gray-400 py-6">
+                    <div class="text-5xl mb-2 animate-pulse">🤖</div>
+                    <p class="text-sm">Waiting for detection...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Emotion Legend -->
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-4 glow">
+            <h3 class="text-sm font-bold mb-3 text-gray-300">🎨 Emotion Colors</h3>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="flex items-center gap-2"><div class="w-3 h-3 bg-yellow-400 rounded-full"></div>😊 Happy</div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 bg-blue-400 rounded-full"></div>😢 Sad</div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-400 rounded-full"></div>😠 Angry</div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 bg-purple-400 rounded-full"></div>😲 Surprised</div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 bg-green-400 rounded-full"></div>😐 Neutral</div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 bg-orange-400 rounded-full"></div>😨 Fear</div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 bg-pink-400 rounded-full"></div>🤢 Disgust</div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const aiStatus = document.getElementById('aiStatus');
+        const faceCountEl = document.getElementById('faceCount');
+        const fpsEl = document.getElementById('fps');
+        const avgConfidenceEl = document.getElementById('avgConfidence');
+        const resultsEl = document.getElementById('results');
+        const loadingModel = document.getElementById('loadingModel');
+
+        let stream = null;
+        let isRunning = false;
+        let modelsLoaded = false;
+        let lastTime = 0;
+        let frameCount = 0;
+
+        const emotionColors = {
+            happy: '#FACC15',
+            sad: '#60A5FA',
+            angry: '#F87171',
+            surprised: '#C084FC',
+            neutral: '#4ADE80',
+            fearful: '#FB923C',
+            disgusted: '#F472B6'
+        };
+
+        const emotionEmojis = {
+            happy: '😊',
+            sad: '😢',
+            angry: '😠',
+            surprised: '😲',
+            neutral: '😐',
+            fearful: '😨',
+            disgusted: '🤢'
+        };
+
+        // Load Face-API Models
+        async function loadModels() {
+            try {
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+                
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                ]);
+                
+                modelsLoaded = true;
+                loadingModel.innerHTML = '✅ AI Models Loaded Successfully!';
+                loadingModel.classList.remove('animate-pulse', 'text-yellow-400');
+                loadingModel.classList.add('text-green-400');
+                
+                setTimeout(() => {
+                    loadingModel.style.display = 'none';
+                }, 2000);
+                
+                console.log('✅ Face-API models loaded');
+            } catch (error) {
+                console.error('Error loading models:', error);
+                loadingModel.innerHTML = '❌ Failed to load AI models';
+                loadingModel.classList.add('text-red-400');
+            }
+        }
+
+        // Start Camera
+        startBtn.onclick = async () => {
+            if (!modelsLoaded) {
+                alert('⚠️ AI models are still loading. Please wait...');
+                return;
+            }
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720, facingMode: 'user' }
+                });
+                
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    video.play();
+                    isRunning = true;
+                    
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    
+                    aiStatus.textContent = 'ACTIVE';
+                    aiStatus.className = 'px-3 py-1 bg-green-600 rounded-full text-xs font-bold animate-pulse';
+                    
+                    detectFaces();
+                };
+            } catch (err) {
+                alert('❌ Camera Error: ' + err.message);
+                console.error(err);
+            }
+        };
+
+        // Stop Camera
+        stopBtn.onclick = () => {
+            isRunning = false;
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            video.srcObject = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            aiStatus.textContent = 'OFFLINE';
+            aiStatus.className = 'px-3 py-1 bg-red-600 rounded-full text-xs font-bold';
+            faceCountEl.textContent = '0';
+            fpsEl.textContent = '0';
+            avgConfidenceEl.textContent = '0%';
+            
+            resultsEl.innerHTML = `
+                <div class="text-center text-gray-400 py-8">
+                    <div class="text-5xl mb-3 animate-pulse">🤖</div>
+                    <p class="text-sm">Waiting for detection...</p>
+                </div>
+            `;
+        };
+
+        // Detect Faces with AI
+        async function detectFaces() {
+            if (!isRunning) return;
+
+            const detections = await faceapi
+                .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceExpressions();
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (detections && detections.length > 0) {
+                faceCountEl.textContent = detections.length;
+                
+                // Calculate average confidence
+                const avgConf = detections.reduce((sum, d) => sum + d.detection.score, 0) / detections.length;
+                avgConfidenceEl.textContent = (avgConf * 100).toFixed(1) + '%';
+                
+                drawDetections(detections);
+                updateResults(detections);
+            } else {
+                faceCountEl.textContent = '0';
+                avgConfidenceEl.textContent = '0%';
+                resultsEl.innerHTML = `
+                    <div class="text-center text-gray-400 py-6">
+                        <div class="text-4xl mb-2">🔍</div>
+                        <p class="text-xs">No faces detected</p>
+                    </div>
+                `;
+            }
+
+            updateFPS();
+            requestAnimationFrame(detectFaces);
+        }
+
+        function drawDetections(detections) {
+            detections.forEach((detection, index) => {
+                const { x, y, width, height } = detection.detection.box;
+                
+                // Get dominant emotion
+                const expressions = detection.expressions;
+                const dominantEmotion = Object.keys(expressions).reduce((a, b) => 
+                    expressions[a] > expressions[b] ? a : b
+                );
+                
+                const color = emotionColors[dominantEmotion] || '#4ADE80';
+                const emoji = emotionEmojis[dominantEmotion] || '😐';
+                const confidence = expressions[dominantEmotion];
+                
+                // Draw main box
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, width, height);
+                
+                // Draw corner brackets
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+                
+                const cornerLen = Math.min(width, height) * 0.25;
+                const thick = 4;
+                
+                // Corners
+                ctx.fillRect(x, y, cornerLen, thick);
+                ctx.fillRect(x, y, thick, cornerLen);
+                ctx.fillRect(x + width - cornerLen, y, cornerLen, thick);
+                ctx.fillRect(x + width - thick, y, thick, cornerLen);
+                ctx.fillRect(x, y + height - thick, cornerLen, thick);
+                ctx.fillRect(x, y + height - cornerLen, thick, cornerLen);
+                ctx.fillRect(x + width - cornerLen, y + height - thick, cornerLen, thick);
+                ctx.fillRect(x + width - thick, y + height - cornerLen, thick, cornerLen);
+                
+                ctx.shadowBlur = 0;
+                
+                // Draw ID badge
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y - 2, 40, 28);
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 16px Arial';
+                ctx.fillText(`#${index + 1}`, x + 8, y + 18);
+                
+                // Draw emotion label
+                const label = `${emoji} ${dominantEmotion.toUpperCase()}`;
+                ctx.font = 'bold 16px Arial';
+                const labelW = ctx.measureText(label).width + 20;
+                const labelX = x + (width - labelW) / 2;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(labelX, y - 38, labelW, 32);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(labelX, y - 38, labelW, 32);
+                
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8;
+                ctx.fillText(label, labelX + 10, y - 14);
+                ctx.shadowBlur = 0;
+                
+                // Draw confidence bar
+                const barW = width * 0.7;
+                const barX = x + (width - barW) / 2;
+                const barY = y + height + 10;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(barX - 5, barY - 5, barW + 10, 24);
+                ctx.strokeStyle = color;
+                ctx.strokeRect(barX - 5, barY - 5, barW + 10, 24);
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(barX, barY, barW, 14);
+                
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+                ctx.fillRect(barX, barY, barW * confidence, 14);
+                ctx.shadowBlur = 0;
+                
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 11px Arial';
+                ctx.fillText(`${(confidence * 100).toFixed(0)}%`, barX + barW - 32, barY + 11);
+            });
+        }
+
+        function updateResults(detections) {
+            let html = '';
+            
+            detections.forEach((detection, i) => {
+                const expressions = detection.expressions;
+                const dominantEmotion = Object.keys(expressions).reduce((a, b) => 
+                    expressions[a] > expressions[b] ? a : b
+                );
+                
+                const color = emotionColors[dominantEmotion];
+                const emoji = emotionEmojis[dominantEmotion];
+                const confidence = expressions[dominantEmotion];
+                
+                // Sort all emotions by probability
+                const sortedEmotions = Object.entries(expressions)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 3);
+                
+                html += `
+                    <div class="bg-gray-700 bg-opacity-40 rounded-xl p-4 border-2 border-opacity-30" style="border-color: ${color}">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="font-bold text-lg">Face #${i + 1}</span>
+                            <span class="text-3xl">${emoji}</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-300">Dominant</span>
+                                <span class="font-bold" style="color: ${color}">${dominantEmotion.toUpperCase()}</span>
+                            </div>
+                            <div class="w-full bg-gray-600 bg-opacity-50 rounded-full h-2.5">
+                                <div class="h-2.5 rounded-full transition-all duration-300" style="width: ${confidence * 100}%; background: ${color}"></div>
+                            </div>
+                            <div class="text-right text-xs text-gray-400 font-bold">${(confidence * 100).toFixed(1)}%</div>
+                            <div class="pt-2 border-t border-gray-600 space-y-1 text-xs">
+                                ${sortedEmotions.map(([emotion, prob]) => `
+                                    <div class="flex justify-between text-gray-400">
+                                        <span>${emotion}</span>
+                                        <span>${(prob * 100).toFixed(0)}%</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsEl.innerHTML = html;
+        }
+
+        function updateFPS() {
+            const now = performance.now();
+            frameCount++;
+            
+            if (now - lastTime >= 1000) {
+                fpsEl.textContent = Math.round((frameCount * 1000) / (now - lastTime));
+                frameCount = 0;
+                lastTime = now;
+            }
+        }
+
+        // Load models on page load
+        loadModels();
+        const uploadFile = document.getElementById("uploadFile");
+const previewImage = document.getElementById("previewImage");
+const analyzeBtn = document.getElementById("analyzeBtn");
+
+// Saat user memilih file
+uploadFile.onchange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+        previewImage.src = e.target.result;
+        previewImage.classList.remove("hidden");
+    };
+
+    reader.readAsDataURL(file);
+};
+
+// Analisis gambar upload
+analyzeBtn.onclick = async () => {
+
+    if (!modelsLoaded) {
+        alert("⚠️ Tunggu model AI selesai dimuat!");
+        return;
+    }
+
+    if (previewImage.src === "" || previewImage.classList.contains("hidden")) {
+        alert("⚠️ Upload gambar terlebih dahulu!");
+        return;
+    }
+
+    // Matikan kamera jika aktif
+    isRunning = false;
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+
+// Resize canvas sesuai ukuran ASLI gambar
+canvas.width = previewImage.naturalWidth;
+canvas.height = previewImage.naturalHeight;
+
+// Bersihkan canvas dulu
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+// Gambar foto ke canvas menggunakan ukuran asli
+ctx.drawImage(
+    previewImage,
+    0,
+    0,
+    previewImage.naturalWidth,
+    previewImage.naturalHeight
+);
+
+// Deteksi wajah
+const detections = await faceapi
+    .detectAllFaces(previewImage, new faceapi.TinyFaceDetectorOptions())
+    .withFaceLandmarks()
+    .withFaceExpressions();
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    resultsEl.innerHTML = "";
+    ctx.drawImage(previewImage, 0, 0, canvas.width, canvas.height);
+
+    if (detections.length === 0) {
+        resultsEl.innerHTML = `
+            <div class="text-center text-gray-400 py-6">
+                <div class="text-4xl mb-2">❌</div>
+                <p class="text-xs">No faces detected in image</p>
+            </div>
+        `;
+        return;
+    }
+
+    detections.forEach((detection, index) => {
+        const box = detection.detection.box;
+
+        // Tentukan emosi dominan
+        const expressions = detection.expressions;
+        const dominantEmotion = Object.keys(expressions)
+            .reduce((a, b) => expressions[a] > expressions[b] ? a : b);
+
+        const color = emotionColors[dominantEmotion];
+        const emoji = emotionEmojis[dominantEmotion];
+
+        // Gambar kotak
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+        // Tambah label
+        ctx.fillStyle = color;
+        ctx.font = "20px Arial";
+        ctx.fillText(`${emoji} ${dominantEmotion}`, box.x, box.y - 10);
+
+        // Tambahkan ke panel hasil
+        resultsEl.innerHTML += `
+            <div class="bg-gray-800 p-3 rounded-lg shadow">
+                <p class="text-sm">${emoji} <strong>${dominantEmotion}</strong></p>
+                <p class="text-xs text-gray-400">Confidence: ${(expressions[dominantEmotion] * 100).toFixed(2)}%</p>
+            </div>
+        `;
+    });
+
+    faceCountEl.textContent = detections.length;
+    aiStatus.textContent = "IMAGE MODE";
+    aiStatus.className = "px-3 py-1 bg-blue-600 rounded-full text-xs font-bold";
+};
+
+    </script>
+</body>
+</html>
