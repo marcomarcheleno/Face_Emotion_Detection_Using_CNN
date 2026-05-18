@@ -182,7 +182,7 @@ This project was published as an academic journal at **Institut Bisnis dan Infor
 > Jason Istioso, Jeremiah Gerard, Marco Marcheleno, Muhammad Akbar Maulana  
 > Program Studi Teknik Informatika, Institut Bisnis dan Informatika Kwik Kian Gie · 2025/2026
 
-📎 [Full Paper (PDF)](./JurnalFaceEmotionTinyFaceDetector-1.pdf) · [Research Report (PDF)](./LaporanPenelitianTinyFaceEmotionDetector-2.pdf)
+📎 [Full Paper — Published in JURTEKSI](https://jurnal.stmikroyal.ac.id/index.php/jurteksi/article/view/4354/2189) · [Research Report (PDF)](./LaporanPenelitianTinyFaceEmotionDetector-2.pdf)
 
 ---
 
